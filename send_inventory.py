@@ -1,48 +1,52 @@
-import requests
+# send_inventory.py (Agent Script)
 import platform
 import socket
+import uuid
 import psutil
-import subprocess
+import requests
+import json
 
-# Server where Flask is running
-FLASK_URL = "http://192.168.0.30:5000/add"  # Replace with your real server IP
+SERVER_URL = "http://192.168.0.30:5000/add"  # Your Flask server IP
 
-# Collect system info
-device_name = socket.gethostname()
-full_device_name = socket.getfqdn()
+def get_device_info():
+    return {
+        "name": f"Laptop|{platform.system()}|1|{get_asset_tag()}|{get_serial_number()}|{platform.node()}|{get_user()}|{get_location()}|{get_year()}|{get_ip()}"
+    }
 
-processor = platform.processor()
-arch, _ = platform.architecture()
-system_type = f"{platform.system()} {arch}"
+def get_serial_number():
+    return str(uuid.getnode())
 
-# RAM
-ram_bytes = psutil.virtual_memory().total
-ram_gb = round(ram_bytes / (1024 ** 3), 1)
+def get_user():
+    return psutil.users()[0].name if psutil.users() else "unknown"
 
-# Pen & touch support (Windows only)
-try:
-    output = subprocess.check_output("powershell Get-PnpDevice | findstr Touch", shell=True).decode()
-    touch_support = "Touch Supported" if "Touch" in output else "No pen or touch input"
-except:
-    touch_support = "Unknown"
+def get_ip():
+    try:
+        hostname = socket.gethostname()
+        ip_address = socket.gethostbyname(hostname)
+        return ip_address
+    except:
+        return "0.0.0.0"
 
-# Build readable string
-item_name = (
-    f"Device: {device_name} | Full: {full_device_name} | CPU: {processor} | "
-    f"RAM: {ram_gb} GB | System: {system_type} | Touch: {touch_support}"
-)
+def get_asset_tag():
+    return "US/CE/LP/001"
 
-# Send to Flask
-data = {
-    "name": item_name,
-    "quantity": 1
-}
+def get_location():
+    return "Mumbai"
 
-try:
-    response = requests.post(FLASK_URL, json=data)
-    if response.status_code == 200:
-        print("✅ System info sent successfully!")
-    else:
-        print(f"❌ Failed to send data: {response.status_code} - {response.text}")
-except Exception as e:
-    print(f"❌ Error: {e}")
+def get_year():
+    return "2025"
+
+def main():
+    try:
+        payload = get_device_info()
+        print(f"Sending: {json.dumps(payload, indent=2)}")
+        res = requests.post(SERVER_URL, json=payload)
+        if res.status_code == 200:
+            print("✅ Data sent successfully.")
+        else:
+            print(f"❌ Failed with status code: {res.status_code}")
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+if __name__ == '__main__':
+    main()
